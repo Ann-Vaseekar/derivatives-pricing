@@ -31,15 +31,17 @@ def european_opt_pricer(
         control (bool): If set true, uses control variates
     """
 
+    assert S0 > 0, 'S0 must be positive'
+    assert sigma > 0, 'sigma must be positive'
+    assert T > 0, 'T must be positive'
     assert option_type in ("call", "put"), 'option_type should be call or put'
 
     rng = np.random.default_rng(seed)
 
     if antithetic:
+        N = N if N % 2 == 0 else N + 1
         Z = rng.normal(0, 1, N//2) 
         Z = np.concatenate((Z, -Z), axis=None)
-        if N % 2 != 0:
-            Z = np.concatenate((Z, rng.normal(0, 1, 1)))
     else:
         Z = rng.normal(0, 1, N)
     
@@ -98,7 +100,12 @@ def bs_analytical_solution(
 
     P_BS = C_BS - S0 + K * np.exp(-r*T)
 
+    gamma = round(norm.pdf(d1) / (S0 * sigma * np.sqrt(T)), 3)
+    vega = round(S0 * norm.pdf(d1) * np.sqrt(T), 3)
+
     if option_type == "call":
-        return round(C_BS, 3)
+        delta = round(norm.cdf(d1), 3)
+        return round(C_BS, 3), delta, gamma, vega
     else:
-        return round(P_BS, 3)
+        delta = round(norm.cdf(d1) - 1, 3)
+        return round(P_BS, 3), delta, gamma, vega
