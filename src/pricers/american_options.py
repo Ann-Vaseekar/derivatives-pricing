@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import solve_banded
+import matplotlib.pyplot as plt
 
 
 def payoff(
@@ -232,3 +233,131 @@ def american_opt_pricer_CN(
     return  np.interp(S0, S_grid, V)
 
 
+
+
+def plot_payoff_and_value(
+    N,
+    S0, 
+    K, 
+    sigma, 
+    r, 
+    T, 
+    option_type, 
+    S_range=(0.5, 1.5)
+):
+    """
+    Plots payoff vs value
+
+    Parameters:
+        N (int): Tree depth (for binomial price)
+        S0 (float): Current spot price of the underlying asset
+        K (float): Strike price
+        sigma (float): Volatility of underlying asset
+        r (float): Risk-free rate
+        T (float): time until maturity (in years)
+        option_type (str): call for call option, put for put option
+    """
+
+    S_vals = np.linspace(K * S_range[0], K * S_range[1], 80)
+    prices = [american_opt_pricer_binomial(N, s, K, sigma, r, T, option_type) for s in S_vals]
+    intrinsic = [payoff(s, K, option_type) for s in S_vals]
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(S_vals, prices, label='Model price', color='steelblue', lw=2)
+    ax.plot(S_vals, intrinsic, label='Intrinsic value', color='tomato', lw=1.5, ls='--')
+    ax.axvline(S0, color='goldenrod', lw=1, ls=':', label=f'S₀ = {S0}')
+    ax.axvline(K,  color='gray',      lw=1, ls=':', label=f'K = {K}', alpha=0.5)
+    ax.fill_between(S_vals, intrinsic, prices, alpha=0.08, color='steelblue', label='Time value')
+    ax.set_xlabel('Spot price S'); ax.set_ylabel('Option value')
+    ax.set_title(f'American {option_type} — payoff & value')
+    ax.legend(); ax.grid(alpha=0.3); plt.tight_layout()
+
+
+def plot_greeks_vs_spot(
+    N,
+    S0, 
+    K, 
+    sigma, 
+    r, 
+    T, 
+    option_type, 
+    S_range=(0.5, 1.5)
+):
+    """
+    Plots greeks vs value
+
+    Parameters:
+        N (int): Tree depth (for binomial price)
+        S0 (float): Current spot price of the underlying asset
+        K (float): Strike price
+        sigma (float): Volatility of underlying asset
+        r (float): Risk-free rate
+        T (float): time until maturity (in years)
+        option_type (str): call for call option, put for put option
+    """
+    S_vals = np.linspace(K * S_range[0], K * S_range[1], 50)
+    g_vals = [greeks(N, s, K, sigma, r, T, option_type) for s in S_vals]
+
+    keys   = ['delta', 'gamma', 'theta', 'vega']
+    colors = ['steelblue', 'seagreen', 'red', 'mediumpurple']
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex=True)
+    for ax, key, color in zip(axes.flat, keys, colors):
+        ax.plot(S_vals, [g[key] for g in g_vals], color=color, lw=2)
+        ax.axvline(S0, color='goldenrod', lw=1, ls=':', alpha=0.7)
+        ax.set_title(key.capitalize()); ax.grid(alpha=0.3)
+
+    for ax in axes[1]: ax.set_xlabel('Spot price S')
+    fig.suptitle(f'American {option_type} — Greeks vs S  (K={K}, σ={sigma}, T={T}y)')
+    plt.tight_layout()
+    return fig
+
+
+def plot_early_exercise_boundary(
+    N,
+    M,
+    K, 
+    sigma, 
+    r, 
+    option_type, 
+    T_range=np.linspace(0.02, 1.0, 40)
+):
+    """
+    Shows the critical spot below/above which early exercise is optimal.
+    
+    Parameters:
+        N (int): Steps in asset price
+        M (int): Steps in time
+        K (float): Strike price
+        sigma (float): Volatility of underlying asset
+        r (float): Risk-free rate
+        option_type (str): call for call option, put for put option
+        T (np.array): grid for time until maturity (in years)
+    """
+    boundaries = []
+    for T in T_range:
+        S_min = K * np.exp(-5 * sigma * np.sqrt(T))
+        S_max = K * np.exp(5 * sigma * np.sqrt(T))
+        S_grid = np.exp(np.linspace(np.log(max(1e-6, S_min)), np.log(S_max), N+1))
+        
+        # price at each S for this T
+        prices = [american_opt_pricer_CN(N, M, s, K, sigma, r, T, option_type) for s in S_grid]
+        intrinsic = [payoff(s, K, option_type) for s in S_grid]
+        
+        # boundary = last S where early exercise is optimal
+        exercised = [p <= iv + 1e-4 for p, iv in zip(prices, intrinsic)]
+        idx = None
+        for i in range(len(exercised)):
+            if exercised[i]:
+                idx = i
+            else:
+                break  # stop at first S where holding dominates
+        boundaries.append(S_grid[idx] if idx is not None else np.nan)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(T_range, boundaries, lw=2, color='steelblue')
+    ax.axhline(K, color='gray', lw=1, ls='--', label='Strike K')
+    ax.set_xlabel('Time to maturity (years)')
+    ax.set_ylabel('Critical spot price')
+    ax.set_title(f'Early exercise boundary — American {option_type}')
+    ax.legend(); ax.grid(alpha=0.3); plt.tight_layout()
