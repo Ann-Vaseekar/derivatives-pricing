@@ -31,10 +31,14 @@ def european_opt_pricer(
         control (bool): If set true, uses control variates
     """
 
-    assert S0 > 0, 'S0 must be positive'
-    assert sigma > 0, 'sigma must be positive'
-    assert T > 0, 'T must be positive'
-    assert option_type in ("call", "put"), 'option_type should be call or put'
+    if S0 <= 0:
+        raise ValueError('S0 must be positive')
+    if sigma <= 0:
+        raise ValueError('sigma must be positive')
+    if T <= 0:
+        raise ValueError('T must be positive')
+    if option_type not in ("call", "put"):
+        raise ValueError(f"option_type must be 'call' or 'put'")
 
     rng = np.random.default_rng(seed)
 
@@ -69,4 +73,4 @@ def european_opt_pricer(
     stderr = std / np.sqrt(len(payoff_discounted))
     MoE = norm.ppf(1-alpha/2) * stderr
 
-    return round(C, 3), (round(C - MoE, 3), round(C + MoE, 3))
+    return C, (C - MoE,C + MoE)

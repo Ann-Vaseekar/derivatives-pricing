@@ -30,12 +30,12 @@ def bs_analytical_solution(
 
     P_BS = C_BS - S0 + K * np.exp(-r*T)
 
-    gamma = round(norm.pdf(d1) / (S0 * sigma * np.sqrt(T)), 3)
-    vega = round(S0 * norm.pdf(d1) * np.sqrt(T), 3)
+    gamma = norm.pdf(d1) / (S0 * sigma * np.sqrt(T))
+    vega = S0 * norm.pdf(d1) * np.sqrt(T)
 
     if option_type == "call":
-        delta = round(norm.cdf(d1), 3)
-        return round(C_BS, 3), delta, gamma, vega
+        delta = norm.cdf(d1)
+        return C_BS, delta, gamma, vega
     else:
-        delta = round(norm.cdf(d1) - 1, 3)
-        return round(P_BS, 3), delta, gamma, vega
+        delta = norm.cdf(d1) - 1
+        return P_BS, delta, gamma, vega
