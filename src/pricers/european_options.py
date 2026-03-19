@@ -31,15 +31,21 @@ def european_opt_pricer(
         control (bool): If set true, uses control variates
     """
 
-    assert option_type in ("call", "put"), 'option_type should be call or put'
+    if S0 <= 0:
+        raise ValueError('S0 must be positive')
+    if sigma <= 0:
+        raise ValueError('sigma must be positive')
+    if T <= 0:
+        raise ValueError('T must be positive')
+    if option_type not in ("call", "put"):
+        raise ValueError(f"option_type must be 'call' or 'put'")
 
     rng = np.random.default_rng(seed)
 
     if antithetic:
+        N = N if N % 2 == 0 else N + 1
         Z = rng.normal(0, 1, N//2) 
         Z = np.concatenate((Z, -Z), axis=None)
-        if N % 2 != 0:
-            Z = np.concatenate((Z, rng.normal(0, 1, 1)))
     else:
         Z = rng.normal(0, 1, N)
     
@@ -67,38 +73,4 @@ def european_opt_pricer(
     stderr = std / np.sqrt(len(payoff_discounted))
     MoE = norm.ppf(1-alpha/2) * stderr
 
-    return round(C, 3), (round(C - MoE, 3), round(C + MoE, 3))
-
-
-def bs_analytical_solution(
-        S0: float, 
-        K: float, 
-        r: float, 
-        sigma: float, 
-        T: float, 
-        option_type: str = "call"
-):
-    """
-    Calculates price of a European option using BS analytical solution
-
-    Parameters:
-        S0 (float): Underlying price of asset
-        K (float): Strike price
-        r (float): Risk-free rate
-        sigma (float): Volatility of underlying asset
-        T (float): time until maturity (in years)
-        option_type (str): call for call option, put for put option
-    """
-    assert option_type in ("call", "put"), 'option_type should be call or put'
-
-    d1 = (np.log(S0/K) + (r+sigma**2/2) * T) / (sigma * np.sqrt(T))
-    d2 = d1 - sigma * np.sqrt(T)
-
-    C_BS = S0 * norm.cdf(d1) - K * np.exp(-r*T)*norm.cdf(d2)
-
-    P_BS = C_BS - S0 + K * np.exp(-r*T)
-
-    if option_type == "call":
-        return round(C_BS, 3)
-    else:
-        return round(P_BS, 3)
+    return C, (C - MoE,C + MoE)
